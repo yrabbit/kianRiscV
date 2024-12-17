@@ -1,12 +1,55 @@
-#!/bin/sh -e
-SRC_DIR=../kianv_harris_mcycle_edition/kianv_harris_edition
-SRCS="${SRC_DIR}/design_elements.v ${SRC_DIR}/../soc.v ${SRC_DIR}/../gowin_rpll/gowin_rpll.v \
-	  ${SRC_DIR}/../qqspi.v ${SRC_DIR}/../tx_uart.v ${SRC_DIR}/../rx_uart.v ${SRC_DIR}/../fifo.v \
-	  ${SRC_DIR}/sdram/m12l64322a_ctrl.v ${SRC_DIR}/../bram.v ${SRC_DIR}/../clint.v \
-	  ${SRC_DIR}/kianv_harris_mc_edition.v ${SRC_DIR}/control_unit.v ${SRC_DIR}/main_fsm.v \
-	  ${SRC_DIR}/load_decoder.v ${SRC_DIR}/store_decoder.v ${SRC_DIR}/csr_decoder.v \
-	  ${SRC_DIR}/alu_decoder.v ${SRC_DIR}/multiplier_extension_decoder.v ${SRC_DIR}/multiplier_decoer.v \
-	  ${SRC_DIR}/divider_decoder.v ${SRC_DIR}/datapath_unit.v ${SRC_DIR}/register_file.v \
-	  ${SRC_DIR}/extend.v ${SRC_DIR}/alu.v ${SRC_DIR}/csr_exception_handler.v"
+PROJ=soc
 
-yosys -p "read_verilog ${SRCS}; synth_gowin -json synth.json -family gw2a"
+
+RM             = rm -rf
+VERILOG_FILES := pll.v \
+								 bram.v \
+								 tx_uart.v \
+								 rx_uart.v \
+								 fifo.v \
+								 qqspi.v \
+								 clint.v \
+								 sdram/mt48lc16m16a2_ctrl.v \
+								 kianv_harris_edition/kianv_harris_mc_edition.v \
+								 kianv_harris_edition/control_unit.v  \
+								 kianv_harris_edition/datapath_unit.v \
+								 kianv_harris_edition/register_file.v \
+								 kianv_harris_edition/design_elements.v \
+								 kianv_harris_edition/alu.v \
+								 kianv_harris_edition/main_fsm.v \
+								 kianv_harris_edition/extend.v \
+								 kianv_harris_edition/alu_decoder.v \
+								 kianv_harris_edition/store_alignment.v \
+								 kianv_harris_edition/store_decoder.v \
+								 kianv_harris_edition/load_decoder.v \
+								 kianv_harris_edition/load_alignment.v \
+								 kianv_harris_edition/multiplier_extension_decoder.v \
+								 kianv_harris_edition/divider.v \
+								 kianv_harris_edition/multiplier.v \
+								 kianv_harris_edition/divider_decoder.v \
+								 kianv_harris_edition/multiplier_decoder.v \
+								 kianv_harris_edition/csr_exception_handler.v \
+								 kianv_harris_edition/csr_decoder.v
+
+all: ${PROJ}.bit
+
+%.json: %.v
+	yosys -DULX3S -p "synth_gowin -family gw2a -json $@ -top ${PROJ}" ${VERILOG_FILES} $<
+
+%_out.config: %.json
+	nextpnr-ecp5  --timing-allow-fail --json $< --textcfg $@ --85k --package CABGA381 --lpf ulx3s_v20.lpf
+
+%.bit: %_out.config
+	#ecppack --compress --freq 125 --input $< --bit $@
+	ecppack --compress --input $< --bit $@
+
+sprog: ${PROJ}.bit
+	fujprog $<
+
+prog: ${PROJ}.bit
+	fujprog -j flash $<
+
+clean:
+	$(RM) -f ${PROJ}.bit ${PROJ}_out.config ${PROJ}.json
+
+#yosys -p "read_verilog ${SRCS}; synth_gowin -json synth.json -family gw2a"
